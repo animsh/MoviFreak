@@ -1,36 +1,40 @@
 package com.apps.movifreak.Home;
 
-import androidx.annotation.NonNull;
+import android.content.Intent;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
+import android.widget.LinearLayout;
+
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
-import androidx.lifecycle.Lifecycle;
-import androidx.lifecycle.LifecycleOwner;
+import androidx.core.content.ContextCompat;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.Observer;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import android.os.Bundle;
-import android.view.MenuItem;
-
 import com.apps.movifreak.Adapter.FavAdapter;
-import com.apps.movifreak.Adapter.MovieAdapter;
 import com.apps.movifreak.Database.AppDatabase;
 import com.apps.movifreak.Database.FavMovie;
+import com.apps.movifreak.Database.FavTvShow;
 import com.apps.movifreak.R;
-import com.apps.movifreak.Utils.AppExecutors;
-import com.apps.movifreak.Utils.NetworkUtils;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class favActivity extends AppCompatActivity {
 
+    private static final String TAG = favActivity.class.getSimpleName();
     private RecyclerView mRecyclerView;
     private FavAdapter myAdapter;
     private AppDatabase mDb;
+
+    //layouts
+    private LinearLayout fav_list_layout;
+    private LinearLayout no_fav_layout;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,6 +43,10 @@ public class favActivity extends AppCompatActivity {
 
         mDb = AppDatabase.getInstance(getApplicationContext());
 
+        //setting up layouts
+        fav_list_layout = findViewById(R.id.fav_list);
+        no_fav_layout = findViewById(R.id.no_fav);
+
         //setting up toolbar
         Toolbar main_toolbar = findViewById(R.id.main_toolbar);
         setSupportActionBar(main_toolbar);
@@ -46,7 +54,9 @@ public class favActivity extends AppCompatActivity {
         main_toolbar.setTitleTextColor(getResources().getColor(R.color.colorRed));
 
         ActionBar actionBar = getSupportActionBar();
-        actionBar.setTitle("Favorite Movies");
+        final Drawable upArrow = ContextCompat.getDrawable(this, R.drawable.ic_backarrow);
+        upArrow.setColorFilter(ContextCompat.getColor(this, R.color.colorText), PorterDuff.Mode.SRC_ATOP);
+        actionBar.setHomeAsUpIndicator(upArrow);
         actionBar.setDisplayHomeAsUpEnabled(true);
 
         //Setting up recycler view
@@ -54,17 +64,65 @@ public class favActivity extends AppCompatActivity {
         GridLayoutManager gridLayoutManager = new GridLayoutManager(favActivity.this, 3, RecyclerView.VERTICAL, false);
         mRecyclerView.setLayoutManager(gridLayoutManager);
         mRecyclerView.setHasFixedSize(true);
-        myAdapter = new FavAdapter(favActivity.this);
+        myAdapter = new FavAdapter(this);
         mRecyclerView.setAdapter(myAdapter);
 
-        //getting fav movie list
-        LiveData<List<FavMovie>> movieList = mDb.movieDao().loadAllMoviesById();
-        movieList.observe(this, new Observer<List<FavMovie>>() {
-            @Override
-            public void onChanged(List<FavMovie> favMovies) {
-                myAdapter.addMovies(favMovies);
+        Intent incomingIntent = getIntent();
+        if (incomingIntent.hasExtra("from_fragment")) {
+            Log.d(TAG, "from: " + incomingIntent.getStringExtra("from_fragment"));
+
+            if (incomingIntent.getStringExtra("from_fragment").equals("TvShowFragment")) {
+
+                actionBar.setTitle("Favorite TvShows");
+
+                //getting fav tvShows list
+                LiveData<List<FavTvShow>> tvShowList = mDb.tvShowDao().loadAllTvShowById();
+
+
+                tvShowList.observe(this, new Observer<List<FavTvShow>>() {
+                    @Override
+                    public void onChanged(List<FavTvShow> favTvShows) {
+//                        Log.d(TAG,"tvShowList: "+favTvShows);
+
+                        if (favTvShows.size() == 0) {
+                            fav_list_layout.setVisibility(View.GONE);
+                            no_fav_layout.setVisibility(View.VISIBLE);
+                        } else {
+
+                            fav_list_layout.setVisibility(View.VISIBLE);
+                            no_fav_layout.setVisibility(View.GONE);
+                            myAdapter.addTvShows(favTvShows, "tvShow");
+                        }
+                    }
+                });
+
+            } else if (incomingIntent.getStringExtra("from_fragment").equals("MovieFragment")) {
+
+                actionBar.setTitle("Favorite Movies");
+
+                //getting fav movie list
+                LiveData<List<FavMovie>> movieList = mDb.movieDao().loadAllMoviesById();
+
+                movieList.observe(this, new Observer<List<FavMovie>>() {
+                    @Override
+                    public void onChanged(List<FavMovie> favMovies) {
+//                        Log.d(TAG,"tvShowList: "+favMovies);
+
+                        if (favMovies.size() == 0) {
+                            fav_list_layout.setVisibility(View.GONE);
+                            no_fav_layout.setVisibility(View.VISIBLE);
+                        } else {
+
+                            fav_list_layout.setVisibility(View.VISIBLE);
+                            no_fav_layout.setVisibility(View.GONE);
+                            myAdapter.addMovies(favMovies, "movie");
+                        }
+                    }
+                });
+
             }
-        });
+
+        }
 
 
     }
